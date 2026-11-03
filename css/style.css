@@ -305,5 +305,6 @@ body { display: flex; }
     padding: 0 12px;
     gap: 8px;
   }
-  #speed-btns .speed-btn[data-speed="120"] { display: none; }
+  #speed-btns .speed-btn[data-speed="300"],
+  #speed-btns .speed-btn[data-speed="600"] { display: none; }
 }

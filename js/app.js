@@ -270,7 +270,7 @@ function clearTrails() {
 function updateTimeDisplay(t) {
   const h = Math.floor(t / 3600);
   const m = Math.floor((t % 3600) / 60);
-  timeDisplay.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  timeDisplay.textContent = `${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}`;
 }
 
 // ── Helpers GeoJSON vuoti ─────────────────────────────────────────────────────
