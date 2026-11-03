@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blooming Peccioli</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <link href="css/style.css" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div id="brand">
+      <span id="brand-blooming">Blooming</span>
+      <span id="brand-peccioli">Peccioli</span>
+    </div>
+
+    <nav id="scenario-nav">
+      <p class="nav-label">Scenario</p>
+      <button class="scenario-btn active" data-scenario="weekday">
+        <span class="btn-icon">🗓</span>
+        <span>Giorno Feriale</span>
+      </button>
+      <button class="scenario-btn" data-scenario="weekend">
+        <span class="btn-icon">🌿</span>
+        <span>Fine Settimana</span>
+      </button>
+      <button class="scenario-btn" data-scenario="eventday">
+        <span class="btn-icon">🎉</span>
+        <span>Giornata Evento</span>
+      </button>
+    </nav>
+
+    <div id="legend">
+      <p class="nav-label">Flotta</p>
+      <div class="legend-item"><span class="dot" style="background:#ED4347"></span>Navetta programmata</div>
+      <div class="legend-item"><span class="dot" style="background:#FFC000"></span>Peccioli</div>
+      <div class="legend-item"><span class="dot" style="background:#41CE69"></span>Forcoli</div>
+      <div class="legend-item"><span class="dot" style="background:#BC7CFF"></span>Fabbrica</div>
+      <div class="legend-item"><span class="dot" style="background:#0875F9"></span>Belvedere</div>
+      <div class="legend-item"><span class="dot" style="background:#FD6BC9"></span>Rosa</div>
+      <div class="legend-item"><span class="dot" style="background:#FF9900"></span>Ghizzano</div>
+    </div>
+  </aside>
+
+  <!-- ── MAPPA ───────────────────────────────────────────────────────── -->
+  <main id="map-container">
+    <div id="map"></div>
+
+    <!-- ── TIMELINE ─────────────────────────────────────────────────── -->
+    <div id="timeline-bar">
+      <button id="play-btn" title="Play / Pausa">
+        <svg id="icon-play"  viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="icon-pause" viewBox="0 0 24 24" style="display:none"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg>
+      </button>
+
+      <div id="time-display">00:00</div>
+
+      <input type="range" id="scrubber" min="0" max="86400" value="0" step="60" />
+
+      <div id="speed-btns">
+        <button class="speed-btn active" data-speed="1">1×</button>
+        <button class="speed-btn" data-speed="10">10×</button>
+        <button class="speed-btn" data-speed="60">60×</button>
+        <button class="speed-btn" data-speed="120">120×</button>
+      </div>
+    </div>
+
+    <!-- ── LOADING ───────────────────────────────────────────────────── -->
+    <div id="loading">
+      <div id="loading-spinner"></div>
+      <span>Caricamento scenario…</span>
+    </div>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
