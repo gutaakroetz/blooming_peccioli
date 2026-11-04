@@ -11,9 +11,9 @@ const TRAIL_WIDTH    = 3;    // px spessore scia
 // ── Stato globale ────────────────────────────────────────────────────────────
 let map;
 let scenario     = null;   // dati JSON caricati
-let simTime      = 0;      // secondi da mezzanotte (0–86400)
+let simTime      = 25200;  // secondi da mezzanotte — default 07h 00
 let playing      = false;
-let speedMult    = 1;
+let speedMult    = 300;
 let lastRafTime  = null;
 let scrubbing    = false;
 
@@ -42,6 +42,23 @@ function initMap() {
   map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
   map.on('load', () => {
+    // Rete stradale locale
+    map.addSource('network', {
+      type: 'geojson',
+      data: 'data/network.geojson',
+    });
+    map.addLayer({
+      id: 'network-roads',
+      type: 'line',
+      source: 'network',
+      paint: {
+        'line-color': '#c8c4bb',
+        'line-width': 1.2,
+        'line-opacity': 0.8,
+      },
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+    });
+
     loadScenario('weekday');
   });
 }
@@ -51,8 +68,8 @@ async function loadScenario(name) {
   showLoading(true);
   pauseAnimation();
   simTime = 0;
-  scrubber.value = 0;
-  updateTimeDisplay(0);
+  scrubber.value = 25200;
+  updateTimeDisplay(25200);
 
   try {
     const res = await fetch(`${SCENARIOS_PATH}${name}.json`);
