@@ -21,6 +21,9 @@ let scrubbing    = false;
 // { vehicleId: [{lat, lng, t}, ...] }
 const trailBuffers = {};
 
+// Marker HTML per il veicolo jolly
+let jollyMarker = null;
+
 // ── Elementi DOM ─────────────────────────────────────────────────────────────
 const playBtn     = document.getElementById('play-btn');
 const iconPlay    = document.getElementById('icon-play');
@@ -103,6 +106,17 @@ async function loadScenario(name) {
 
 // ── Source/Layer per un veicolo ───────────────────────────────────────────────
 function addVehicleLayers(vehicle) {
+  // Il jolly usa un HTML marker invece dei layer MapLibre
+  if (vehicle.type === 'jolly') {
+    const el = document.createElement('div');
+    el.className = 'jolly-marker';
+    el.innerHTML = '<div class="jolly-inner"></div>';
+    jollyMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
+      .setLngLat([10.72, 43.56])
+      .addTo(map);
+    return;
+  }
+
   const dotSourceId   = `src-dot-${vehicle.id}`;
   const trailSourceId = `src-trail-${vehicle.id}`;
   const dotLayerId    = `lyr-dot-${vehicle.id}`;
@@ -156,6 +170,7 @@ function addVehicleLayers(vehicle) {
 function removeVehicleLayers() {
   if (!scenario) return;
   scenario.vehicles.forEach(v => {
+    if (v.type === 'jolly') return;
     [`lyr-dot-${v.id}`, `lyr-trail-${v.id}`].forEach(id => {
       if (map.getLayer(id)) map.removeLayer(id);
     });
@@ -163,6 +178,10 @@ function removeVehicleLayers() {
       if (map.getSource(id)) map.removeSource(id);
     });
   });
+  if (jollyMarker) {
+    jollyMarker.remove();
+    jollyMarker = null;
+  }
 }
 
 // ── Interpolazione posizione ──────────────────────────────────────────────────
@@ -198,6 +217,19 @@ function updateVehicles(t) {
   if (!scenario || !map.isStyleLoaded()) return;
 
   scenario.vehicles.forEach(v => {
+    // Jolly: aggiorna HTML marker
+    if (v.type === 'jolly') {
+      if (!jollyMarker) return;
+      const pos = interpolatePosition(v.waypoints, t);
+      if (pos) {
+        jollyMarker.setLngLat([pos.lng, pos.lat]);
+        jollyMarker.getElement().style.display = 'block';
+      } else {
+        jollyMarker.getElement().style.display = 'none';
+      }
+      return;
+    }
+
     const pos = interpolatePosition(v.waypoints, t);
     const dotSrc   = map.getSource(`src-dot-${v.id}`);
     const trailSrc = map.getSource(`src-trail-${v.id}`);

@@ -266,6 +266,47 @@ body { display: flex; }
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* ── JOLLY MARKER ─────────────────────────────────────────────────────────── */
+.jolly-marker {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: conic-gradient(
+    #ff0000, #ff7700, #ffff00, #00cc44, #0066ff, #9900cc, #ff0000
+  );
+  animation: jolly-spin 1.4s linear infinite;
+  box-shadow: 0 0 0 2px #fff, 0 1px 5px rgba(0,0,0,.35);
+  cursor: default;
+  position: relative;
+}
+.jolly-inner {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: #fff;
+}
+@keyframes jolly-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Jolly nella legenda */
+.jolly-dot-legend {
+  background: conic-gradient(
+    #ff0000, #ff7700, #ffff00, #00cc44, #0066ff, #9900cc, #ff0000
+  );
+  animation: jolly-spin 1.4s linear infinite;
+  position: relative;
+  overflow: hidden;
+}
+.jolly-dot-legend::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: white;
+}
+
 /* ── MAPLIBRE OVERRIDES ───────────────────────────────────────────────────── */
 .maplibregl-ctrl-bottom-right { bottom: 90px !important; }
 .maplibregl-ctrl-attrib { font-size: 10px !important; }
