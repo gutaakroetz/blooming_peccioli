@@ -2,6 +2,17 @@
 
 const MAP_STYLE      = 'https://tiles.openfreemap.org/styles/positron';
 const SCENARIOS_PATH = 'data/scenarios/';
+const BLOOMING_PATH  = 'data/blooming.geojson';
+
+const BACINO_COLORS = {
+  peccioli:  '#FFC000',
+  forcoli:   '#41CE69',
+  fabbrica:  '#BC7CFF',
+  belvedere: '#0875F9',
+  rosa:      '#FD6BC9',
+  ghizzano:  '#FF9900',
+};
+const BACINO_ORDER = ['peccioli','forcoli','fabbrica','belvedere','rosa','ghizzano'];
 
 const TRAIL_LENGTH   = 10;    // posizioni nella scia
 const TRAIL_INTERVAL = 30;    // secondi tra i punti della scia
@@ -62,6 +73,7 @@ function initMap() {
       paint: { 'line-color': '#b0aca3', 'line-width': 1.0, 'line-opacity': 0.5 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     });
+    startClock();
     loadScenario('weekday');
   });
 }
@@ -106,7 +118,7 @@ async function loadScenario(name) {
   renderHourMarks();
 
   showLoading(false);
-  playAnimation();
+  runIntroAnimation(scenario.fixed_stops || []);
 }
 
 // ── Layer veicoli ─────────────────────────────────────────────────────────────
@@ -172,8 +184,8 @@ function renderFixedStops(stops) {
   stops.forEach(stop => {
     const wrap = document.createElement('div');
     wrap.className = 'stop-marker-el';
-    wrap.innerHTML = `<div class="stop-dot-wrap"><div class="stop-dot"></div></div><span class="stop-label">${stop.label}</span>`;
-    const m = new maplibregl.Marker({ element: wrap, anchor: 'left' })
+    wrap.innerHTML = `<span class="stop-label">${stop.label}</span><div class="stop-dot-wrap"><div class="stop-dot"></div></div>`;
+    const m = new maplibregl.Marker({ element: wrap, anchor: 'right' })
       .setLngLat([stop.lng, stop.lat])
       .addTo(map);
     fixedStopMarkers.push(m);
@@ -484,6 +496,177 @@ document.querySelectorAll('.scenario-btn').forEach(btn => {
     loadScenario(btn.dataset.scenario);
   });
 });
+
+// ── Bloom intro animation ─────────────────────────────────────────────────────
+function springEase(t) {
+  // Overshoots slightly then settles — bouncy feel
+  return 1 - Math.exp(-5.5 * t) * Math.cos(10 * t);
+}
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+function removeBloomLayers() {
+  [...BACINO_ORDER, 'spine'].forEach(name => {
+    const fill   = `bloom-fill-${name}`;
+    const stroke = `bloom-stroke-${name}`;
+    const line   = `bloom-spine-line`;
+    if (map.getLayer(fill))   map.removeLayer(fill);
+    if (map.getLayer(stroke)) map.removeLayer(stroke);
+    if (map.getLayer(line))   map.removeLayer(line);
+    if (map.getSource(`bloom-${name}`)) map.removeSource(`bloom-${name}`);
+    if (map.getSource('bloom-spine'))   map.removeSource('bloom-spine');
+  });
+}
+
+async function runIntroAnimation(fixedStops) {
+  removeBloomLayers();
+
+  let geojson;
+  try {
+    const res = await fetch(BLOOMING_PATH);
+    if (!res.ok) throw new Error();
+    geojson = await res.json();
+  } catch {
+    playAnimation();
+    return;
+  }
+
+  // Group by Layer property (lowercase)
+  const byLayer = {};
+  geojson.features.forEach(f => {
+    const l = (f.properties.Layer || f.properties.layer || '').toLowerCase();
+    (byLayer[l] = byLayer[l] || []).push(f);
+  });
+
+  // Add fill + stroke sources for each bacino
+  BACINO_ORDER.forEach(bacino => {
+    const feats = byLayer[bacino] || [];
+    if (!feats.length) return;
+    map.addSource(`bloom-${bacino}`, {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: feats },
+    });
+    // Insert below network-roads so vehicles appear on top
+    map.addLayer({
+      id: `bloom-fill-${bacino}`, type: 'fill', source: `bloom-${bacino}`,
+      paint: { 'fill-color': BACINO_COLORS[bacino], 'fill-opacity': 0, 'fill-translate': [0, 20] },
+    }, 'network-roads');
+    map.addLayer({
+      id: `bloom-stroke-${bacino}`, type: 'line', source: `bloom-${bacino}`,
+      paint: { 'line-color': '#fff', 'line-width': 0.8, 'line-opacity': 0 },
+    }, 'network-roads');
+  });
+
+  // Spine source (starts empty, filled progressively)
+  const spineFeats = byLayer['spine'] || [];
+  if (spineFeats.length) {
+    map.addSource('bloom-spine', { type: 'geojson', lineMetrics: true,
+      data: { type: 'FeatureCollection', features: [] } });
+    map.addLayer({
+      id: 'bloom-spine-line', type: 'line', source: 'bloom-spine',
+      paint: {
+        'line-width': 2.5, 'line-opacity': 0,
+        'line-gradient': ['interpolate',['linear'],['line-progress'],
+          0,'rgba(100,100,120,0)', 1,'rgba(100,100,140,0.85)'],
+      },
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+    });
+  }
+
+  // ── Animate petals in sequence ──────────────────────────────────────────────
+  const PETAL_DUR = 600;    // ms per petal animation
+  const PETAL_GAP = 130;    // ms between petals
+  const TARGET_FILL_OP = 0.32;
+
+  function animatePetal(bacino, startAt) {
+    return new Promise(resolve => {
+      setTimeout(() => {
+        const t0 = performance.now();
+        function frame(now) {
+          const t = Math.min((now - t0) / PETAL_DUR, 1);
+          const e = springEase(t);
+          const op = Math.min(e * TARGET_FILL_OP, 1);
+          const ty = (1 - Math.min(e, 1)) * 20;
+          if (map.getLayer(`bloom-fill-${bacino}`)) {
+            map.setPaintProperty(`bloom-fill-${bacino}`, 'fill-opacity', op);
+            map.setPaintProperty(`bloom-fill-${bacino}`, 'fill-translate', [0, ty]);
+          }
+          if (map.getLayer(`bloom-stroke-${bacino}`)) {
+            map.setPaintProperty(`bloom-stroke-${bacino}`, 'line-opacity', Math.min(op * 2, 0.5));
+          }
+          if (t < 1) requestAnimationFrame(frame);
+          else resolve();
+        }
+        requestAnimationFrame(frame);
+      }, startAt);
+    });
+  }
+
+  // Fire all petals with staggered starts, don't await each
+  BACINO_ORDER.forEach((bacino, i) => {
+    if (byLayer[bacino]?.length) animatePetal(bacino, i * PETAL_GAP);
+  });
+
+  const afterPetals = BACINO_ORDER.length * PETAL_GAP + PETAL_DUR + 300;
+
+  // ── Animate spine bottom→top ────────────────────────────────────────────────
+  setTimeout(() => {
+    if (!spineFeats.length) return;
+    const feat = spineFeats[0];
+    let coords = feat.geometry.type === 'LineString'
+      ? [...feat.geometry.coordinates]
+      : [...(feat.geometry.coordinates[0] || [])];
+    // Ensure bottom-to-top (ascending latitude)
+    if (coords.length >= 2 && coords[0][1] > coords[coords.length - 1][1]) coords.reverse();
+
+    if (map.getLayer('bloom-spine-line'))
+      map.setPaintProperty('bloom-spine-line', 'line-opacity', 0.75);
+
+    const SPINE_DUR = 1400;
+    const t0 = performance.now();
+    function frame(now) {
+      const t = Math.min((now - t0) / SPINE_DUR, 1);
+      const count = Math.max(2, Math.round(easeInOut(t) * coords.length));
+      const src = map.getSource('bloom-spine');
+      if (src) src.setData({ type: 'FeatureCollection', features: [{
+        type: 'Feature', geometry: { type: 'LineString', coordinates: coords.slice(0, count) },
+        properties: feat.properties,
+      }]});
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }, afterPetals);
+
+  // ── Fade out spine ──────────────────────────────────────────────────────────
+  const spineEnd = afterPetals + 1400 + 2800;
+  setTimeout(() => {
+    if (!map.getLayer('bloom-spine-line')) return;
+    const t0 = performance.now();
+    function frame(now) {
+      const t = Math.min((now - t0) / 700, 1);
+      map.setPaintProperty('bloom-spine-line', 'line-opacity', (1 - t) * 0.75);
+      if (t < 1) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }, spineEnd);
+
+  // ── Start vehicles after full intro ────────────────────────────────────────
+  setTimeout(playAnimation, spineEnd + 700 + 200);
+}
+
+// ── Real-time clock ───────────────────────────────────────────────────────────
+function startClock() {
+  const el = document.getElementById('realtime-clock');
+  if (!el) return;
+  function tick() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    el.textContent = `${h}:${m}:${s}`;
+  }
+  tick();
+  setInterval(tick, 1000);
+}
 
 // ── Avvio ─────────────────────────────────────────────────────────────────────
 initMap();

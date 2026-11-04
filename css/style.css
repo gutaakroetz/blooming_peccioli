@@ -2,7 +2,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --sidebar-w: 290px;
+  --sidebar-w: 310px;
   --timeline-h: 76px;
   --bg:         #f7f6f2;
   --surface:    #ffffff;
@@ -301,8 +301,9 @@ body { display: flex; }
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   pointer-events: none;
+  /* anchor:'right' means the dot-wrap (last child) sits on the coordinate */
 }
 
 .stop-label {
@@ -529,6 +530,40 @@ body { display: flex; }
 /* Courier New per stat values */
 .km-bar-val, #users-val, #time-display {
   font-family: 'Courier New', Courier, monospace;
+}
+
+/* ── CLOCK WIDGET ─────────────────────────────────────────────────────────── */
+#clock-widget {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px 14px 7px;
+  box-shadow: var(--shadow);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  pointer-events: none;
+}
+#clock-label {
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+#realtime-clock {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: .04em;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── MAPLIBRE OVERRIDES ───────────────────────────────────────────────────── */
