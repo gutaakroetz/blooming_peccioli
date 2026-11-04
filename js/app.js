@@ -108,9 +108,15 @@ async function loadScenario(name) {
 function addVehicleLayers(vehicle) {
   // Il jolly usa un HTML marker invece dei layer MapLibre
   if (vehicle.type === 'jolly') {
+    // Wrapper neutro — MapLibre imposta transform: translate(X,Y) su questo elemento.
+    // La rotazione CSS va su un figlio, altrimenti la keyframe animation sovrascrive
+    // il translate di MapLibre e il marker resta bloccato in posizione fissa.
     const el = document.createElement('div');
-    el.className = 'jolly-marker';
-    el.innerHTML = '<div class="jolly-inner"></div>';
+    el.style.cssText = 'width:18px;height:18px;position:relative;';
+    const spin = document.createElement('div');
+    spin.className = 'jolly-marker';
+    spin.innerHTML = '<div class="jolly-inner"></div>';
+    el.appendChild(spin);
     jollyMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
       .setLngLat([10.72, 43.56])
       .addTo(map);
