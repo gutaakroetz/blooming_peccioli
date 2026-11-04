@@ -18,6 +18,8 @@
       <span id="brand-peccioli">Peccioli</span>
     </div>
 
+    <p id="project-desc">Sistema di trasporto on-demand per il Comune di Peccioli. I veicoli collegano le frazioni al hub principale e alla stazione di Pontedera in tre scenari: giorno feriale, fine settimana e giornata evento.</p>
+
     <nav id="scenario-nav">
       <p class="nav-label">Scenario</p>
       <button class="scenario-btn active" data-scenario="weekday">
@@ -36,29 +38,28 @@
 
     <div id="legend">
       <p class="nav-label">Flotta</p>
-      <!-- colori sincronizzati con COLORS nel notebook Python -->
-      <div class="legend-item"><span class="dot" style="background:#6a994e"></span>Peccioli</div>
-      <div class="legend-item"><span class="dot" style="background:#e63946"></span>Forcoli</div>
-      <div class="legend-item"><span class="dot" style="background:#457b9d"></span>Fabbrica</div>
-      <div class="legend-item"><span class="dot" style="background:#2a9d8f"></span>Belvedere</div>
-      <div class="legend-item"><span class="dot" style="background:#e9c46a"></span>Rosa</div>
-      <div class="legend-item"><span class="dot" style="background:#f4a261"></span>Ghizzano</div>
-      <div class="legend-item"><span class="dot jolly-dot-legend" style="width:11px;height:11px;border-radius:50%;flex-shrink:0"></span>Jolly</div>
+      <div class="legend-item"><span class="dot" style="background:#FFC000"></span>Peccioli</div>
+      <div class="legend-item"><span class="dot" style="background:#41CE69"></span>Forcoli</div>
+      <div class="legend-item"><span class="dot" style="background:#BC7CFF"></span>Fabbrica</div>
+      <div class="legend-item"><span class="dot" style="background:#0875F9"></span>Belvedere</div>
+      <div class="legend-item"><span class="dot" style="background:#FD6BC9"></span>Rosa</div>
+      <div class="legend-item"><span class="dot" style="background:#FF9900"></span>Ghizzano</div>
+      <div class="legend-item"><span class="dot jolly-dot-legend" style="width:11px;height:11px;border-radius:50%;flex-shrink:0;box-sizing:border-box"></span>Jolly</div>
     </div>
 
-    <p id="project-desc">Sistema di trasporto on-demand per il Comune di Peccioli. I veicoli collegano le frazioni al hub principale e alla stazione di Pontedera in tre scenari: giorno feriale, fine settimana e giornata evento.</p>
-
     <div id="stats-section">
-      <p class="nav-label">Km percorsi</p>
+      <p class="nav-label nav-label-stats">Km percorsi</p>
       <div id="km-bars"><!-- popolato da JS --></div>
       <div id="users-row">
-        <p class="nav-label" style="margin-top:10px">Utenti potenziali</p>
+        <p class="nav-label nav-label-stats" style="margin-top:12px">Utenti potenziali</p>
         <div class="users-bar-row">
           <div class="users-bar-track"><div id="users-bar"></div></div>
           <span id="users-val">0</span>
         </div>
       </div>
     </div>
+
+    <p id="credits">Developed by Maria Augusta Kroetz at <a href="https://www.systematica.net" target="_blank" rel="noopener">Systematica S.p.A</a> in collaboration with <a href="https://www.blive.it" target="_blank" rel="noopener">B.Live</a> for the Municipality of Peccioli and Pontedera.</p>
   </aside>
 
   <!-- ── MAPPA ───────────────────────────────────────────────────────── -->

@@ -2,7 +2,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --sidebar-w: 260px;
+  --sidebar-w: 290px;
   --timeline-h: 76px;
   --bg:         #f7f6f2;
   --surface:    #ffffff;
@@ -270,43 +270,30 @@ body { display: flex; }
 
 /* ── JOLLY MARKER ─────────────────────────────────────────────────────────── */
 .jolly-marker {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  background: conic-gradient(
-    #e8b4d8, #b4c8e8, #b4e8d0, #e8e8b4, #e8c4b4, #e8b4d8
-  );
-  animation: jolly-spin 3s linear infinite;
-  box-shadow: 0 0 0 1.5px rgba(255,255,255,.8), 0 1px 4px rgba(0,0,0,.25);
+  background: #fff;
+  border: 2px solid rgba(180,180,220,.5);
+  box-shadow:
+    0 0 0 2px rgba(255,255,255,.6),
+    0 0 8px 3px rgba(180,160,240,.45),
+    0 1px 4px rgba(0,0,0,.18);
+  animation: jolly-pulse 2.4s ease-in-out infinite;
   cursor: default;
   position: relative;
 }
-.jolly-inner {
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.9);
-}
-@keyframes jolly-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+@keyframes jolly-pulse {
+  0%,100% { box-shadow: 0 0 0 2px rgba(255,255,255,.6), 0 0 8px 3px rgba(180,160,240,.45), 0 1px 4px rgba(0,0,0,.18); }
+  50%      { box-shadow: 0 0 0 2px rgba(255,255,255,.8), 0 0 14px 5px rgba(200,180,255,.65), 0 1px 4px rgba(0,0,0,.18); }
 }
 
 /* Jolly nella legenda */
 .jolly-dot-legend {
-  background: conic-gradient(
-    #e8b4d8, #b4c8e8, #b4e8d0, #e8e8b4, #e8c4b4, #e8b4d8
-  );
-  animation: jolly-spin 3s linear infinite;
-  position: relative;
-  overflow: hidden;
-}
-.jolly-dot-legend::after {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border-radius: 50%;
-  background: rgba(255,255,255,.9);
+  background: #fff;
+  border: 1.5px solid rgba(180,180,220,.5);
+  box-shadow: 0 0 6px 2px rgba(180,160,240,.4);
+  animation: jolly-pulse 2.4s ease-in-out infinite;
 }
 
 /* ── FERMATE FISSE ────────────────────────────────────────────────────────── */
@@ -502,12 +489,42 @@ body { display: flex; }
 #project-desc {
   font-family: 'Courier New', Courier, monospace;
   font-size: 10px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--text-muted);
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
-  margin-top: 4px;
 }
+
+/* ── CREDITS ──────────────────────────────────────────────────────────────── */
+#credits {
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  opacity: 0.75;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+#credits a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 700;
+}
+#credits a:hover { text-decoration: underline; }
+
+/* ── STATS bigger ─────────────────────────────────────────────────────────── */
+.nav-label-stats {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+.km-bar-row { margin-bottom: 7px; }
+.km-bar-track { height: 7px; }
+.km-bar-label { font-size: 12px; min-width: 66px; }
+.km-bar-val   { font-size: 11px; min-width: 36px; }
+.users-bar-track { height: 9px; }
+#users-val { font-size: 13px; font-weight: 800; }
 
 /* Courier New per stat values */
 .km-bar-val, #users-val, #time-display {

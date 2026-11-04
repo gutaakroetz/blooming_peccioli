@@ -127,11 +127,10 @@ function addVehicleLayers(vehicle) {
     });
     // Marker HTML con rotazione (wrapper neutro per evitare conflitto transform)
     const el   = document.createElement('div');
-    el.style.cssText = 'width:14px;height:14px;position:relative;';
-    const spin = document.createElement('div');
-    spin.className = 'jolly-marker';
-    spin.innerHTML = '<div class="jolly-inner"></div>';
-    el.appendChild(spin);
+    el.style.cssText = 'width:13px;height:13px;position:relative;';
+    const dot = document.createElement('div');
+    dot.className = 'jolly-marker';
+    el.appendChild(dot);
     jollyMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
       .setLngLat([10.72, 43.56])
       .addTo(map);
