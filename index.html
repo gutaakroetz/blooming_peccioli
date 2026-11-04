@@ -36,13 +36,25 @@
 
     <div id="legend">
       <p class="nav-label">Flotta</p>
-      <div class="legend-item"><span class="dot" style="background:#FFC000"></span>Peccioli</div>
-      <div class="legend-item"><span class="dot" style="background:#41CE69"></span>Forcoli</div>
-      <div class="legend-item"><span class="dot" style="background:#BC7CFF"></span>Fabbrica</div>
-      <div class="legend-item"><span class="dot" style="background:#0875F9"></span>Belvedere</div>
-      <div class="legend-item"><span class="dot" style="background:#FD6BC9"></span>Rosa</div>
-      <div class="legend-item"><span class="dot" style="background:#FF9900"></span>Ghizzano</div>
+      <div class="legend-item"><span class="dot" style="background:#6a994e"></span>Peccioli</div>
+      <div class="legend-item"><span class="dot" style="background:#e63946"></span>Forcoli</div>
+      <div class="legend-item"><span class="dot" style="background:#457b9d"></span>Fabbrica</div>
+      <div class="legend-item"><span class="dot" style="background:#2a9d8f"></span>Belvedere</div>
+      <div class="legend-item"><span class="dot" style="background:#e9c46a"></span>Rosa</div>
+      <div class="legend-item"><span class="dot" style="background:#f4a261"></span>Ghizzano</div>
       <div class="legend-item"><span class="dot jolly-dot-legend"></span>Jolly</div>
+    </div>
+
+    <div id="stats-section">
+      <p class="nav-label">Km percorsi</p>
+      <div id="km-bars"><!-- popolato da JS --></div>
+      <div id="users-row">
+        <p class="nav-label" style="margin-top:10px">Utenti potenziali</p>
+        <div class="users-bar-row">
+          <div class="users-bar-track"><div id="users-bar"></div></div>
+          <span id="users-val">0</span>
+        </div>
+      </div>
     </div>
   </aside>
 
@@ -59,7 +71,10 @@
 
       <div id="time-display">00:00</div>
 
-      <input type="range" id="scrubber" min="0" max="86400" value="0" step="60" />
+      <div id="scrubber-wrap">
+        <input type="range" id="scrubber" min="0" max="86400" value="0" step="60" />
+        <div id="timeline-hours"></div>
+      </div>
 
       <div id="speed-btns">
         <button class="speed-btn active" data-speed="300">300×</button>

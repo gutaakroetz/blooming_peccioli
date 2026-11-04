@@ -3,7 +3,7 @@
 
 :root {
   --sidebar-w: 220px;
-  --timeline-h: 64px;
+  --timeline-h: 76px;
   --bg:         #f7f6f2;
   --surface:    #ffffff;
   --border:     #e8e6df;
@@ -34,10 +34,11 @@ body { display: flex; }
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 20px;
   padding: 24px 16px;
   z-index: 10;
   box-shadow: var(--shadow);
+  overflow-y: auto;
 }
 
 #map-container {
@@ -156,6 +157,7 @@ body { display: flex; }
   gap: 12px;
   padding: 0 20px;
   z-index: 10;
+  flex-wrap: nowrap;
 }
 
 #play-btn {
@@ -305,6 +307,193 @@ body { display: flex; }
   inset: 3px;
   border-radius: 50%;
   background: white;
+}
+
+/* ── FERMATE FISSE ────────────────────────────────────────────────────────── */
+.stop-marker-el {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  pointer-events: none;
+}
+
+.stop-label {
+  background: rgba(255,255,255,.92);
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-size: 9.5px;
+  font-weight: 800;
+  font-family: var(--font);
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,.18);
+  color: #333;
+  letter-spacing: .01em;
+}
+
+.stop-dot-wrap {
+  position: relative;
+  width: 12px;
+  height: 12px;
+  overflow: visible;
+}
+
+.stop-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #e63946;
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,.35);
+}
+
+.stop-ripple {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  border: 2px solid #e63946;
+  animation: ripple-out 1.6s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes ripple-out {
+  from { transform: scale(1); opacity: 0.85; }
+  to   { transform: scale(7); opacity: 0; }
+}
+
+/* ── STATISTICHE SIDEBAR ──────────────────────────────────────────────────── */
+#stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.km-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.km-bar-label {
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 56px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.km-bar-track {
+  flex: 1;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.km-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  width: 0%;
+  transition: width .15s linear;
+}
+
+.km-bar-val {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.users-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.users-bar-track {
+  flex: 1;
+  height: 7px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+#users-bar {
+  height: 100%;
+  border-radius: 4px;
+  width: 0%;
+  background: linear-gradient(90deg, #2a9d8f, #2a6a3f);
+  transition: width .15s linear;
+}
+
+#users-val {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-main);
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── TIMELINE HOURS ───────────────────────────────────────────────────────── */
+#scrubber-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+#scrubber-wrap #scrubber {
+  width: 100%;
+  flex: none;
+}
+
+#timeline-hours {
+  position: relative;
+  height: 18px;
+  width: 100%;
+  /* account for the scrubber thumb overhang (~8px each side) */
+  padding: 0 8px;
+}
+
+.hour-tick {
+  position: absolute;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity .15s;
+  pointer-events: auto;
+}
+.hour-tick:hover { opacity: 1; }
+
+.hour-tick-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.hour-tick-label {
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── MAPLIBRE OVERRIDES ───────────────────────────────────────────────────── */

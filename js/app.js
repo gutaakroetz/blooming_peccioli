@@ -1,28 +1,36 @@
 /* ── Blooming Peccioli — app.js ─────────────────────────────────────────── */
 
-const MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron';
+const MAP_STYLE      = 'https://tiles.openfreemap.org/styles/positron';
 const SCENARIOS_PATH = 'data/scenarios/';
 
-const TRAIL_LENGTH   = 10;   // numero di posizioni nella scia
-const TRAIL_INTERVAL = 30;   // secondi tra i punti della scia
-const DOT_RADIUS     = 7;    // px raggio dot veicolo
-const TRAIL_WIDTH    = 3;    // px spessore scia
+const TRAIL_LENGTH   = 10;    // posizioni nella scia
+const TRAIL_INTERVAL = 30;    // secondi tra i punti della scia
+const DOT_RADIUS     = 7;     // px raggio dot veicolo
+const TRAIL_WIDTH    = 3;     // px spessore scia
+const HIT_RADIUS_KM  = 0.15;  // 150 m — raggio per rilevare passaggio su fermata
+const HIT_COOLDOWN_S = 300;   // 5 min cooldown per veicolo/fermata
+const KM_BAR_MAX     = 300;   // km massimi per scalare la barra
 
 // ── Stato globale ────────────────────────────────────────────────────────────
 let map;
-let scenario     = null;   // dati JSON caricati
-let simTime      = 25200;  // secondi da mezzanotte — default 07h 00
+let scenario     = null;
+let simTime      = 25200;   // secondi — default 07h 00
+let prevSimTime  = 25200;
 let playing      = false;
 let speedMult    = 300;
 let lastRafTime  = null;
 let scrubbing    = false;
 
-// Per ogni veicolo: buffer delle ultime posizioni per la scia
-// { vehicleId: [{lat, lng, t}, ...] }
 const trailBuffers = {};
+let jollyMarker    = null;
 
-// Marker HTML per il veicolo jolly
-let jollyMarker = null;
+// Fixed stop markers (HTML Marker) e mappa stopId → DOM element
+let fixedStopMarkers = [];
+let fixedStopDotMap  = {};   // stopId → .stop-dot-wrap
+
+// Pre-computed data per statistiche
+let stopHitsData  = [];   // [{t, stopId, vehicleId}] sorted by t
+let precomputedKm = {};   // {vehicleId: {tArr, kmArr}}
 
 // ── Elementi DOM ─────────────────────────────────────────────────────────────
 const playBtn     = document.getElementById('play-btn');
@@ -32,7 +40,6 @@ const timeDisplay = document.getElementById('time-display');
 const scrubber    = document.getElementById('scrubber');
 const loadingEl   = document.getElementById('loading');
 
-// Inizializza display subito, prima che la mappa carichi
 scrubber.value = 25200;
 updateTimeDisplay(25200);
 
@@ -49,23 +56,12 @@ function initMap() {
   map.addControl(new maplibregl.NavigationControl(), 'bottom-right');
 
   map.on('load', () => {
-    // Rete stradale locale
-    map.addSource('network', {
-      type: 'geojson',
-      data: 'data/network.geojson',
-    });
+    map.addSource('network', { type: 'geojson', data: 'data/network.geojson' });
     map.addLayer({
-      id: 'network-roads',
-      type: 'line',
-      source: 'network',
-      paint: {
-        'line-color': '#b0aca3',
-        'line-width': 1.0,
-        'line-opacity': 0.5,
-      },
+      id: 'network-roads', type: 'line', source: 'network',
+      paint: { 'line-color': '#b0aca3', 'line-width': 1.0, 'line-opacity': 0.5 },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     });
-
     loadScenario('weekday');
   });
 }
@@ -74,7 +70,7 @@ function initMap() {
 async function loadScenario(name) {
   showLoading(true);
   pauseAnimation();
-  simTime = 0;
+  simTime = prevSimTime = 25200;
   scrubber.value = 25200;
   updateTimeDisplay(25200);
 
@@ -88,30 +84,37 @@ async function loadScenario(name) {
     return;
   }
 
-  // Rimuovi layer/sources precedenti
   removeVehicleLayers();
-
-  // Resetta trail buffer
   Object.keys(trailBuffers).forEach(k => delete trailBuffers[k]);
 
-  // Crea layer per ogni veicolo
   scenario.vehicles.forEach(v => {
     trailBuffers[v.id] = [];
     addVehicleLayers(v);
   });
 
+  // Fermate fisse e dati pre-calcolati
+  if (scenario.fixed_stops && scenario.fixed_stops.length) {
+    renderFixedStops(scenario.fixed_stops);
+    stopHitsData = precomputeStopHits(scenario.vehicles, scenario.fixed_stops);
+  } else {
+    stopHitsData = [];
+  }
+
+  precomputedKm = precomputeKmArrays(scenario.vehicles);
+  initStats(scenario.vehicles);
+  updateStats(simTime);
+  renderHourMarks();
+
   showLoading(false);
   playAnimation();
 }
 
-// ── Source/Layer per un veicolo ───────────────────────────────────────────────
+// ── Layer veicoli ─────────────────────────────────────────────────────────────
 function addVehicleLayers(vehicle) {
-  // Il jolly usa un HTML marker invece dei layer MapLibre
   if (vehicle.type === 'jolly') {
-    // Wrapper neutro — MapLibre imposta transform: translate(X,Y) su questo elemento.
-    // La rotazione CSS va su un figlio, altrimenti la keyframe animation sovrascrive
-    // il translate di MapLibre e il marker resta bloccato in posizione fissa.
-    const el = document.createElement('div');
+    // Wrapper neutro — MapLibre imposta transform:translate() su questo elemento.
+    // La rotazione CSS va su un figlio per evitare conflitti con il posizionamento.
+    const el   = document.createElement('div');
     el.style.cssText = 'width:18px;height:18px;position:relative;';
     const spin = document.createElement('div');
     spin.className = 'jolly-marker';
@@ -123,107 +126,200 @@ function addVehicleLayers(vehicle) {
     return;
   }
 
-  const dotSourceId   = `src-dot-${vehicle.id}`;
-  const trailSourceId = `src-trail-${vehicle.id}`;
-  const dotLayerId    = `lyr-dot-${vehicle.id}`;
-  const trailLayerId  = `lyr-trail-${vehicle.id}`;
+  map.addSource(`src-dot-${vehicle.id}`,   { type: 'geojson', data: emptyPoint() });
+  map.addSource(`src-trail-${vehicle.id}`, { type: 'geojson', data: emptyLine()  });
 
-  // Source dot (Point)
-  map.addSource(dotSourceId, {
-    type: 'geojson',
-    data: emptyPoint(),
-  });
-
-  // Source trail (LineString)
-  map.addSource(trailSourceId, {
-    type: 'geojson',
-    data: emptyLine(),
-  });
-
-  // Layer scia — sotto il dot
   map.addLayer({
-    id: trailLayerId,
-    type: 'line',
-    source: trailSourceId,
-    paint: {
-      'line-color': vehicle.color,
-      'line-width': TRAIL_WIDTH,
-      'line-opacity': 0.45,
-      'line-blur': 1,
-    },
-    layout: {
-      'line-cap': 'round',
-      'line-join': 'round',
-    },
+    id: `lyr-trail-${vehicle.id}`, type: 'line', source: `src-trail-${vehicle.id}`,
+    paint: { 'line-color': vehicle.color, 'line-width': TRAIL_WIDTH, 'line-opacity': 0.45, 'line-blur': 1 },
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
   });
-
-  // Layer dot
   map.addLayer({
-    id: dotLayerId,
-    type: 'circle',
-    source: dotSourceId,
-    paint: {
-      'circle-radius': DOT_RADIUS,
-      'circle-color': vehicle.color,
-      'circle-stroke-width': 2,
-      'circle-stroke-color': '#ffffff',
-      'circle-opacity': 1,
-    },
+    id: `lyr-dot-${vehicle.id}`, type: 'circle', source: `src-dot-${vehicle.id}`,
+    paint: { 'circle-radius': DOT_RADIUS, 'circle-color': vehicle.color,
+             'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff', 'circle-opacity': 1 },
   });
 }
 
-// ── Rimuovi tutti i layer veicoli ────────────────────────────────────────────
 function removeVehicleLayers() {
   if (!scenario) return;
   scenario.vehicles.forEach(v => {
     if (v.type === 'jolly') return;
-    [`lyr-dot-${v.id}`, `lyr-trail-${v.id}`].forEach(id => {
-      if (map.getLayer(id)) map.removeLayer(id);
-    });
-    [`src-dot-${v.id}`, `src-trail-${v.id}`].forEach(id => {
-      if (map.getSource(id)) map.removeSource(id);
+    [`lyr-dot-${v.id}`, `lyr-trail-${v.id}`].forEach(id => { if (map.getLayer(id)) map.removeLayer(id); });
+    [`src-dot-${v.id}`, `src-trail-${v.id}`].forEach(id => { if (map.getSource(id)) map.removeSource(id); });
+  });
+  if (jollyMarker) { jollyMarker.remove(); jollyMarker = null; }
+  clearFixedStops();
+}
+
+// ── Fermate fisse ─────────────────────────────────────────────────────────────
+function renderFixedStops(stops) {
+  stops.forEach(stop => {
+    const wrap = document.createElement('div');
+    wrap.className = 'stop-marker-el';
+    wrap.innerHTML = `<span class="stop-label">${stop.label}</span><div class="stop-dot-wrap"><div class="stop-dot"></div></div>`;
+    const m = new maplibregl.Marker({ element: wrap, anchor: 'bottom' })
+      .setLngLat([stop.lng, stop.lat])
+      .addTo(map);
+    fixedStopMarkers.push(m);
+    fixedStopDotMap[stop.id] = wrap.querySelector('.stop-dot-wrap');
+  });
+}
+
+function clearFixedStops() {
+  fixedStopMarkers.forEach(m => m.remove());
+  fixedStopMarkers = [];
+  fixedStopDotMap  = {};
+}
+
+function triggerRipple(stopId) {
+  const el = fixedStopDotMap[stopId];
+  if (!el) return;
+  for (let i = 0; i < 3; i++) {
+    const r = document.createElement('div');
+    r.className = 'stop-ripple';
+    r.style.animationDelay = `${i * 0.35}s`;
+    el.appendChild(r);
+    r.addEventListener('animationend', () => r.remove(), { once: true });
+  }
+}
+
+// ── Statistiche ───────────────────────────────────────────────────────────────
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R  = 6371;
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lng2 - lng1) * Math.PI / 180;
+  const a  = Math.sin(Δφ/2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function precomputeKmArrays(vehicles) {
+  const result = {};
+  vehicles.forEach(v => {
+    const wps   = v.waypoints || [];
+    const tArr  = wps.map(w => w.t);
+    const kmArr = [0];
+    for (let i = 1; i < wps.length; i++) {
+      kmArr.push(kmArr[i - 1] + haversineKm(wps[i-1].lat, wps[i-1].lng, wps[i].lat, wps[i].lng));
+    }
+    result[v.id] = { tArr, kmArr };
+  });
+  return result;
+}
+
+function getKmAtT(vehicleId, t) {
+  const { tArr, kmArr } = precomputedKm[vehicleId] || { tArr: [], kmArr: [] };
+  if (!tArr.length) return 0;
+  if (t <= tArr[0]) return 0;
+  if (t >= tArr[tArr.length - 1]) return kmArr[kmArr.length - 1];
+  let lo = 0, hi = tArr.length - 1;
+  while (lo < hi - 1) { const mid = (lo + hi) >> 1; if (tArr[mid] <= t) lo = mid; else hi = mid; }
+  const frac = (t - tArr[lo]) / (tArr[hi] - tArr[lo]);
+  return kmArr[lo] + (kmArr[hi] - kmArr[lo]) * frac;
+}
+
+function precomputeStopHits(vehicles, fixedStops) {
+  const hits = [];
+  vehicles.forEach(v => {
+    const lastHitT = {};
+    (v.waypoints || []).forEach(wp => {
+      fixedStops.forEach(stop => {
+        if (haversineKm(wp.lat, wp.lng, stop.lat, stop.lng) < HIT_RADIUS_KM) {
+          const lt = lastHitT[stop.id] ?? -Infinity;
+          if (wp.t - lt > HIT_COOLDOWN_S) {
+            hits.push({ t: wp.t, stopId: stop.id, vehicleId: v.id });
+            lastHitT[stop.id] = wp.t;
+          }
+        }
+      });
     });
   });
-  if (jollyMarker) {
-    jollyMarker.remove();
-    jollyMarker = null;
-  }
+  return hits.sort((a, b) => a.t - b.t);
+}
+
+function initStats(vehicles) {
+  const kmBars = document.getElementById('km-bars');
+  if (!kmBars) return;
+  kmBars.innerHTML = '';
+  vehicles.forEach(v => {
+    const isJolly  = v.type === 'jolly';
+    const fillStyle = isJolly
+      ? 'background:conic-gradient(#ff0000,#ff7700,#ffff00,#00cc44,#0066ff,#9900cc,#ff0000)'
+      : `background:${v.color}`;
+    const labelColor = isJolly ? '#888' : v.color;
+    const row = document.createElement('div');
+    row.className = 'km-bar-row';
+    row.innerHTML = `
+      <span class="km-bar-label" style="color:${labelColor}">${v.label}</span>
+      <div class="km-bar-track"><div class="km-bar-fill" id="km-bar-${v.id}" style="${fillStyle}"></div></div>
+      <span class="km-bar-val" id="km-val-${v.id}">0</span>`;
+    kmBars.appendChild(row);
+  });
+}
+
+function updateStats(t) {
+  if (!scenario) return;
+  scenario.vehicles.forEach(v => {
+    const km  = getKmAtT(v.id, t);
+    const bar = document.getElementById(`km-bar-${v.id}`);
+    const val = document.getElementById(`km-val-${v.id}`);
+    if (bar) bar.style.width = `${Math.min((km / KM_BAR_MAX) * 100, 100)}%`;
+    if (val) val.textContent  = km.toFixed(1);
+  });
+
+  const hits     = stopHitsData.filter(h => h.t <= t).length;
+  const users    = hits * 18;
+  const maxUsers = stopHitsData.length * 18 || 1;
+  const usersBar = document.getElementById('users-bar');
+  const usersVal = document.getElementById('users-val');
+  if (usersBar) usersBar.style.width = `${Math.min((users / maxUsers) * 100, 100)}%`;
+  if (usersVal) usersVal.textContent  = users;
+}
+
+// ── Ore sulla timeline ────────────────────────────────────────────────────────
+function renderHourMarks() {
+  const container = document.getElementById('timeline-hours');
+  if (!container) return;
+  container.innerHTML = '';
+  [0, 3, 6, 7, 8, 9, 12, 15, 17, 18, 21, 24].forEach(h => {
+    const t   = h * 3600;
+    const pct = (t / 86400) * 100;
+    const tick = document.createElement('div');
+    tick.className = 'hour-tick';
+    tick.style.left = `${pct}%`;
+    tick.title = `Vai alle ${String(h).padStart(2,'0')}:00`;
+    tick.innerHTML = `<div class="hour-tick-dot"></div><span class="hour-tick-label">${String(h).padStart(2,'0')}</span>`;
+    tick.addEventListener('click', () => {
+      simTime = prevSimTime = t;
+      scrubber.value = t;
+      updateTimeDisplay(t);
+      clearTrails();
+      updateVehicles(t);
+      updateStats(t);
+    });
+    container.appendChild(tick);
+  });
 }
 
 // ── Interpolazione posizione ──────────────────────────────────────────────────
 function interpolatePosition(waypoints, t) {
   if (!waypoints || waypoints.length === 0) return null;
-
-  const first = waypoints[0];
-  const last  = waypoints[waypoints.length - 1];
-
-  // Prima o dopo la finestra temporale del veicolo
+  const first = waypoints[0], last = waypoints[waypoints.length - 1];
   if (t < first.t || t > last.t) return null;
-
-  // Trova i due waypoint che racchiudono t
   let lo = 0, hi = waypoints.length - 1;
-  while (lo < hi - 1) {
-    const mid = (lo + hi) >> 1;
-    if (waypoints[mid].t <= t) lo = mid; else hi = mid;
-  }
-
-  const a = waypoints[lo];
-  const b = waypoints[hi];
+  while (lo < hi - 1) { const mid = (lo + hi) >> 1; if (waypoints[mid].t <= t) lo = mid; else hi = mid; }
+  const a = waypoints[lo], b = waypoints[hi];
   if (a.t === b.t) return { lat: a.lat, lng: a.lng };
-
   const frac = (t - a.t) / (b.t - a.t);
-  return {
-    lat: a.lat + (b.lat - a.lat) * frac,
-    lng: a.lng + (b.lng - a.lng) * frac,
-  };
+  return { lat: a.lat + (b.lat - a.lat) * frac, lng: a.lng + (b.lng - a.lng) * frac };
 }
 
-// ── Aggiorna tutte le posizioni ───────────────────────────────────────────────
+// ── Aggiorna posizioni ────────────────────────────────────────────────────────
 function updateVehicles(t) {
   if (!scenario || !map.isStyleLoaded()) return;
 
   scenario.vehicles.forEach(v => {
-    // Jolly: aggiorna HTML marker
     if (v.type === 'jolly') {
       if (!jollyMarker) return;
       const pos = interpolatePosition(v.waypoints, t);
@@ -236,40 +332,27 @@ function updateVehicles(t) {
       return;
     }
 
-    const pos = interpolatePosition(v.waypoints, t);
+    const pos      = interpolatePosition(v.waypoints, t);
     const dotSrc   = map.getSource(`src-dot-${v.id}`);
     const trailSrc = map.getSource(`src-trail-${v.id}`);
     if (!dotSrc || !trailSrc) return;
 
     if (!pos) {
-      // Veicolo non attivo: nascondi
       dotSrc.setData(emptyPoint());
       trailSrc.setData(emptyLine());
       return;
     }
 
-    // Aggiorna dot
-    dotSrc.setData({
-      type: 'Feature',
-      geometry: { type: 'Point', coordinates: [pos.lng, pos.lat] },
-    });
+    dotSrc.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: [pos.lng, pos.lat] } });
 
-    // Aggiorna scia
-    const buf = trailBuffers[v.id];
+    const buf    = trailBuffers[v.id];
     const lastPt = buf[buf.length - 1];
     if (!lastPt || Math.abs(t - lastPt.t) >= TRAIL_INTERVAL) {
       buf.push({ lat: pos.lat, lng: pos.lng, t });
       if (buf.length > TRAIL_LENGTH) buf.shift();
     }
-
     if (buf.length >= 2) {
-      trailSrc.setData({
-        type: 'Feature',
-        geometry: {
-          type: 'LineString',
-          coordinates: buf.map(p => [p.lng, p.lat]),
-        },
-      });
+      trailSrc.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: buf.map(p => [p.lng, p.lat]) } });
     } else {
       trailSrc.setData(emptyLine());
     }
@@ -280,19 +363,29 @@ function updateVehicles(t) {
 function animationLoop(rafTime) {
   if (!playing) return;
 
+  const tBefore = simTime;
+
   if (lastRafTime !== null) {
-    const dtMs  = rafTime - lastRafTime;
-    const dtSim = (dtMs / 1000) * speedMult;   // secondi simulati
-    simTime = Math.min(simTime + dtSim, 86400);
+    simTime = Math.min(simTime + ((rafTime - lastRafTime) / 1000) * speedMult, 86400);
   }
   lastRafTime = rafTime;
 
+  // Ripple sui passaggi alle fermate fisse
+  if (simTime > tBefore) {
+    for (const hit of stopHitsData) {
+      if (hit.t > simTime) break;
+      if (hit.t > tBefore && hit.t <= simTime) triggerRipple(hit.stopId);
+    }
+  }
+
   updateVehicles(simTime);
+  updateStats(simTime);
   updateTimeDisplay(simTime);
   scrubber.value = Math.round(simTime);
+  prevSimTime    = simTime;
 
   if (simTime >= 86400) {
-    simTime = 0;
+    simTime = prevSimTime = 25200;
     clearTrails();
   }
 
@@ -302,79 +395,46 @@ function animationLoop(rafTime) {
 // ── Controlli ─────────────────────────────────────────────────────────────────
 function playAnimation() {
   if (playing) return;
-  playing = true;
-  lastRafTime = null;
-  iconPlay.style.display  = 'none';
-  iconPause.style.display = '';
+  playing = true; lastRafTime = null;
+  iconPlay.style.display = 'none'; iconPause.style.display = '';
   requestAnimationFrame(animationLoop);
 }
-
 function pauseAnimation() {
-  playing = false;
-  lastRafTime = null;
-  iconPlay.style.display  = '';
-  iconPause.style.display = 'none';
+  playing = false; lastRafTime = null;
+  iconPlay.style.display = ''; iconPause.style.display = 'none';
 }
-
-function togglePlay() {
-  playing ? pauseAnimation() : playAnimation();
-}
+function togglePlay() { playing ? pauseAnimation() : playAnimation(); }
 
 function clearTrails() {
   if (!scenario) return;
   scenario.vehicles.forEach(v => { trailBuffers[v.id] = []; });
 }
 
-// ── Time display ──────────────────────────────────────────────────────────────
 function updateTimeDisplay(t) {
   const h = Math.floor(t / 3600);
   const m = Math.floor((t % 3600) / 60);
   timeDisplay.textContent = `${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}`;
 }
 
-// ── Helpers GeoJSON vuoti ─────────────────────────────────────────────────────
-function emptyPoint() {
-  return { type: 'FeatureCollection', features: [] };
-}
-function emptyLine() {
-  return { type: 'FeatureCollection', features: [] };
-}
-
-// ── Loading overlay ───────────────────────────────────────────────────────────
-function showLoading(show) {
-  loadingEl.classList.toggle('hidden', !show);
-}
+function emptyPoint() { return { type: 'FeatureCollection', features: [] }; }
+function emptyLine()  { return { type: 'FeatureCollection', features: [] }; }
+function showLoading(show) { loadingEl.classList.toggle('hidden', !show); }
 
 // ── Event listeners ───────────────────────────────────────────────────────────
-
-// Play/pausa
 playBtn.addEventListener('click', togglePlay);
 
-// Scrubber — trascina manualmente
-scrubber.addEventListener('mousedown', () => {
-  scrubbing = true;
-  pauseAnimation();
-});
-scrubber.addEventListener('touchstart', () => {
-  scrubbing = true;
-  pauseAnimation();
-});
+scrubber.addEventListener('mousedown', () => { scrubbing = true; pauseAnimation(); });
+scrubber.addEventListener('touchstart', () => { scrubbing = true; pauseAnimation(); });
 scrubber.addEventListener('input', () => {
-  simTime = Number(scrubber.value);
+  simTime = prevSimTime = Number(scrubber.value);
   updateTimeDisplay(simTime);
   clearTrails();
   updateVehicles(simTime);
+  updateStats(simTime);
 });
-scrubber.addEventListener('mouseup', () => {
-  scrubbing = false;
-  playAnimation();
-});
-scrubber.addEventListener('touchend', () => {
-  scrubbing = false;
-  playAnimation();
-});
+scrubber.addEventListener('mouseup',  () => { scrubbing = false; playAnimation(); });
+scrubber.addEventListener('touchend', () => { scrubbing = false; playAnimation(); });
 
-// Velocità
 document.querySelectorAll('.speed-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.speed-btn').forEach(b => b.classList.remove('active'));
@@ -383,7 +443,6 @@ document.querySelectorAll('.speed-btn').forEach(btn => {
   });
 });
 
-// Scenario
 document.querySelectorAll('.scenario-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
