@@ -2,7 +2,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --sidebar-w: 220px;
+  --sidebar-w: 260px;
   --timeline-h: 76px;
   --bg:         #f7f6f2;
   --surface:    #ffffff;
@@ -270,14 +270,14 @@ body { display: flex; }
 
 /* ── JOLLY MARKER ─────────────────────────────────────────────────────────── */
 .jolly-marker {
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: conic-gradient(
-    #ff0000, #ff7700, #ffff00, #00cc44, #0066ff, #9900cc, #ff0000
+    #e8b4d8, #b4c8e8, #b4e8d0, #e8e8b4, #e8c4b4, #e8b4d8
   );
-  animation: jolly-spin 1.4s linear infinite;
-  box-shadow: 0 0 0 2px #fff, 0 1px 5px rgba(0,0,0,.35);
+  animation: jolly-spin 3s linear infinite;
+  box-shadow: 0 0 0 1.5px rgba(255,255,255,.8), 0 1px 4px rgba(0,0,0,.25);
   cursor: default;
   position: relative;
 }
@@ -285,7 +285,7 @@ body { display: flex; }
   position: absolute;
   inset: 4px;
   border-radius: 50%;
-  background: #fff;
+  background: rgba(255,255,255,.9);
 }
 @keyframes jolly-spin {
   from { transform: rotate(0deg); }
@@ -295,9 +295,9 @@ body { display: flex; }
 /* Jolly nella legenda */
 .jolly-dot-legend {
   background: conic-gradient(
-    #ff0000, #ff7700, #ffff00, #00cc44, #0066ff, #9900cc, #ff0000
+    #e8b4d8, #b4c8e8, #b4e8d0, #e8e8b4, #e8c4b4, #e8b4d8
   );
-  animation: jolly-spin 1.4s linear infinite;
+  animation: jolly-spin 3s linear infinite;
   position: relative;
   overflow: hidden;
 }
@@ -306,7 +306,7 @@ body { display: flex; }
   position: absolute;
   inset: 3px;
   border-radius: 50%;
-  background: white;
+  background: rgba(255,255,255,.9);
 }
 
 /* ── FERMATE FISSE ────────────────────────────────────────────────────────── */
@@ -356,13 +356,13 @@ body { display: flex; }
   height: 12px;
   margin: -6px 0 0 -6px;
   border-radius: 50%;
-  border: 2px solid #e63946;
-  animation: ripple-out 1.6s ease-out forwards;
+  border: 1px solid #e63946;
+  animation: ripple-out 2s ease-out forwards;
   pointer-events: none;
 }
 @keyframes ripple-out {
-  from { transform: scale(1); opacity: 0.85; }
-  to   { transform: scale(7); opacity: 0; }
+  from { transform: scale(1); opacity: 0.6; }
+  to   { transform: scale(4); opacity: 0; }
 }
 
 /* ── STATISTICHE SIDEBAR ──────────────────────────────────────────────────── */
@@ -469,31 +469,49 @@ body { display: flex; }
 
 .hour-tick {
   position: absolute;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 2px;
   cursor: pointer;
-  opacity: 0.5;
+  opacity: 0.45;
   transition: opacity .15s;
   pointer-events: auto;
 }
 .hour-tick:hover { opacity: 1; }
 
 .hour-tick-dot {
-  width: 4px;
-  height: 4px;
+  width: 3px;
+  height: 3px;
   border-radius: 50%;
   background: var(--text-muted);
 }
 
 .hour-tick-label {
-  font-size: 8.5px;
+  font-size: 7.5px;
   font-weight: 700;
   color: var(--text-muted);
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  background: rgba(247,246,242,.7);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* ── PROJECT DESCRIPTION ──────────────────────────────────────────────────── */
+#project-desc {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 4px;
+}
+
+/* Courier New per stat values */
+.km-bar-val, #users-val, #time-display {
+  font-family: 'Courier New', Courier, monospace;
 }
 
 /* ── MAPLIBRE OVERRIDES ───────────────────────────────────────────────────── */

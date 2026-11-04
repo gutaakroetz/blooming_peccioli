@@ -112,10 +112,22 @@ async function loadScenario(name) {
 // ── Layer veicoli ─────────────────────────────────────────────────────────────
 function addVehicleLayers(vehicle) {
   if (vehicle.type === 'jolly') {
-    // Wrapper neutro — MapLibre imposta transform:translate() su questo elemento.
-    // La rotazione CSS va su un figlio per evitare conflitti con il posizionamento.
+    // Scia come layer MapLibre
+    map.addSource('src-trail-jolly', { type: 'geojson', data: emptyLine(), lineMetrics: true });
+    map.addLayer({
+      id: 'lyr-trail-jolly', type: 'line', source: 'src-trail-jolly',
+      paint: {
+        'line-width': 2,
+        'line-opacity': 0.5,
+        'line-blur': 1,
+        'line-gradient': ['interpolate', ['linear'], ['line-progress'],
+          0, 'rgba(200,160,212,0)', 1, 'rgba(200,160,212,1)'],
+      },
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+    });
+    // Marker HTML con rotazione (wrapper neutro per evitare conflitto transform)
     const el   = document.createElement('div');
-    el.style.cssText = 'width:18px;height:18px;position:relative;';
+    el.style.cssText = 'width:14px;height:14px;position:relative;';
     const spin = document.createElement('div');
     spin.className = 'jolly-marker';
     spin.innerHTML = '<div class="jolly-inner"></div>';
@@ -123,6 +135,8 @@ function addVehicleLayers(vehicle) {
     jollyMarker = new maplibregl.Marker({ element: el, anchor: 'center' })
       .setLngLat([10.72, 43.56])
       .addTo(map);
+    el.style.display = 'none';   // nascosto finché non inizia a muoversi
+    trailBuffers['jolly'] = [];
     return;
   }
 
@@ -149,6 +163,8 @@ function removeVehicleLayers() {
     [`src-dot-${v.id}`, `src-trail-${v.id}`].forEach(id => { if (map.getSource(id)) map.removeSource(id); });
   });
   if (jollyMarker) { jollyMarker.remove(); jollyMarker = null; }
+  if (map.getLayer('lyr-trail-jolly')) map.removeLayer('lyr-trail-jolly');
+  if (map.getSource('src-trail-jolly')) map.removeSource('src-trail-jolly');
   clearFixedStops();
 }
 
@@ -245,7 +261,7 @@ function initStats(vehicles) {
   vehicles.forEach(v => {
     const isJolly  = v.type === 'jolly';
     const fillStyle = isJolly
-      ? 'background:conic-gradient(#ff0000,#ff7700,#ffff00,#00cc44,#0066ff,#9900cc,#ff0000)'
+      ? 'background:conic-gradient(#e8b4d8,#b4c8e8,#b4e8d0,#e8e8b4,#e8c4b4,#e8b4d8)'
       : `background:${v.color}`;
     const labelColor = isJolly ? '#888' : v.color;
     const row = document.createElement('div');
@@ -282,7 +298,7 @@ function renderHourMarks() {
   const container = document.getElementById('timeline-hours');
   if (!container) return;
   container.innerHTML = '';
-  [0, 3, 6, 7, 8, 9, 12, 15, 17, 18, 21, 24].forEach(h => {
+  for (let h = 0; h <= 24; h += 2) {
     const t   = h * 3600;
     const pct = (t / 86400) * 100;
     const tick = document.createElement('div');
@@ -299,7 +315,7 @@ function renderHourMarks() {
       updateStats(t);
     });
     container.appendChild(tick);
-  });
+  }
 }
 
 // ── Interpolazione posizione ──────────────────────────────────────────────────
@@ -323,11 +339,27 @@ function updateVehicles(t) {
     if (v.type === 'jolly') {
       if (!jollyMarker) return;
       const pos = interpolatePosition(v.waypoints, t);
+      const trailSrc = map.getSource('src-trail-jolly');
       if (pos) {
         jollyMarker.setLngLat([pos.lng, pos.lat]);
         jollyMarker.getElement().style.display = 'block';
+        // Scia jolly
+        if (trailSrc) {
+          const buf = trailBuffers['jolly'] || [];
+          const lastPt = buf[buf.length - 1];
+          if (!lastPt || Math.abs(t - lastPt.t) >= TRAIL_INTERVAL) {
+            buf.push({ lat: pos.lat, lng: pos.lng, t });
+            if (buf.length > TRAIL_LENGTH) buf.shift();
+            trailBuffers['jolly'] = buf;
+          }
+          if (buf.length >= 2) {
+            trailSrc.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: buf.map(p => [p.lng, p.lat]) } });
+          }
+        }
       } else {
         jollyMarker.getElement().style.display = 'none';
+        if (trailSrc) trailSrc.setData(emptyLine());
+        trailBuffers['jolly'] = [];
       }
       return;
     }
@@ -408,6 +440,9 @@ function togglePlay() { playing ? pauseAnimation() : playAnimation(); }
 function clearTrails() {
   if (!scenario) return;
   scenario.vehicles.forEach(v => { trailBuffers[v.id] = []; });
+  trailBuffers['jolly'] = [];
+  const trailSrc = map.getSource('src-trail-jolly');
+  if (trailSrc) trailSrc.setData(emptyLine());
 }
 
 function updateTimeDisplay(t) {
