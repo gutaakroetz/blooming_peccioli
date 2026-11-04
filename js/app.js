@@ -172,8 +172,8 @@ function renderFixedStops(stops) {
   stops.forEach(stop => {
     const wrap = document.createElement('div');
     wrap.className = 'stop-marker-el';
-    wrap.innerHTML = `<span class="stop-label">${stop.label}</span><div class="stop-dot-wrap"><div class="stop-dot"></div></div>`;
-    const m = new maplibregl.Marker({ element: wrap, anchor: 'bottom' })
+    wrap.innerHTML = `<div class="stop-dot-wrap"><div class="stop-dot"></div></div><span class="stop-label">${stop.label}</span>`;
+    const m = new maplibregl.Marker({ element: wrap, anchor: 'left' })
       .setLngLat([stop.lng, stop.lat])
       .addTo(map);
     fixedStopMarkers.push(m);

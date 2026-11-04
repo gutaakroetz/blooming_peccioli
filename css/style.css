@@ -299,9 +299,9 @@ body { display: flex; }
 /* ── FERMATE FISSE ────────────────────────────────────────────────────────── */
 .stop-marker-el {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 3px;
+  gap: 8px;
   pointer-events: none;
 }
 
