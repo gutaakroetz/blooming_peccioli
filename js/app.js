@@ -29,6 +29,10 @@ const timeDisplay = document.getElementById('time-display');
 const scrubber    = document.getElementById('scrubber');
 const loadingEl   = document.getElementById('loading');
 
+// Inizializza display subito, prima che la mappa carichi
+scrubber.value = 25200;
+updateTimeDisplay(25200);
+
 // ── Init mappa ───────────────────────────────────────────────────────────────
 function initMap() {
   map = new maplibregl.Map({
@@ -52,9 +56,9 @@ function initMap() {
       type: 'line',
       source: 'network',
       paint: {
-        'line-color': '#c8c4bb',
-        'line-width': 1.2,
-        'line-opacity': 0.8,
+        'line-color': '#b0aca3',
+        'line-width': 1.0,
+        'line-opacity': 0.5,
       },
       layout: { 'line-cap': 'round', 'line-join': 'round' },
     });
